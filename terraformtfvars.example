@@ -1,0 +1,7 @@
+# Rename this tile to terraform.tfvars and substitute your values.
+
+password = ""
+
+username = ""
+
+resource_g = ""
