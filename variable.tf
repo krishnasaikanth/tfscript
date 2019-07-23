@@ -22,28 +22,41 @@ variable "subnet" {
   description = "name of subnet01"
   default = "subnet011"
 }
+
+variable "backsub" {
+  description = "backend machine subnet group"
+  default = "subnet2"
+}
+
 variable "nsgrule" {
 description = "network security group rule"
 default = "rule1"
 }
 
-variable "count" {
-description = "number of instanes of a given resource"
-default = "2"
-
-}
-
 variable "aznetworkinterface" {
-
 description = "used to name the network interface"
 default = "networkintfc1"
 }
 
-variable "virtualmachinename" {
+variable "aznetworkinterface2" {
+description = "used to name the network interface"
+default = "networkintfc2"
+}
+
+variable "frontend" {
   description = "name of the computing resources"
-  default = "MainCPU1"
-  
-  }
+  default = "JumpServer"
+}
+
+variable "backend" {
+  description = "name of the computing resources"
+  default = "Appserver"
+}
+
+variable "disk" {
+description = "name of os disk"
+default = "disk0"
+}
 
 variable "username" {
   description = "name of the login username"
@@ -54,9 +67,12 @@ variable "password" {
   
 }
 
-variable "backsub" {
-  description = "backend machine subnet group"
-  default = "subnet2"
+variable "username1" {
+  description = "name of the login username"
+  }
+
+variable "password1" {
+  description = "login password"
 }
 
 variable "NI" {

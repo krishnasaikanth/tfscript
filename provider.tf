@@ -13,13 +13,24 @@ resource "azurerm_virtual_network" "demo" {
   address_space       = ["10.0.0.0/16"]
   }
 
-resource "azurerm_subnet" "demo" {
+#Create Subnet
+
+resource "azurerm_subnet" "front" {
     name           = "${var.subnet}"
      resource_group_name  = "${azurerm_resource_group.demo.name}"
     virtual_network_name = "${azurerm_virtual_network.demo.name}"
     address_prefix = "10.0.1.0/24"
 }
-resource "azurerm_network_interface" "demo" {
+
+resource "azurerm_subnet" "back" {
+    name           = "${var.backsub}"
+     resource_group_name  = "${azurerm_resource_group.demo.name}"
+    virtual_network_name = "${azurerm_virtual_network.demo.name}"
+        address_prefix = "10.0.2.0/24"
+}
+
+#Create network interface
+resource "azurerm_network_interface" "front" {
   name                = "${var.aznetworkinterface}"
   location            = "${azurerm_resource_group.demo.location}"
   resource_group_name = "${azurerm_resource_group.demo.name}"   
@@ -27,18 +38,65 @@ resource "azurerm_network_interface" "demo" {
 
     ip_configuration {
     name                          = "frontendipconfig"
-    subnet_id                     = "${azurerm_subnet.demo.id}"
+    subnet_id                     = "${azurerm_subnet.front.id}"
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id = "${azurerm_public_ip.demo.id}"
   }
 }
 
-resource "azurerm_virtual_machine" "demo" {
-    name                  = "${var.virtualmachinename}-${count.index}"
+resource "azurerm_network_interface" "back" {
+  name                = "${var.aznetworkinterface2}"
+  location            = "${azurerm_resource_group.demo.location}"
+  resource_group_name = "${azurerm_resource_group.demo.name}"   
+  network_security_group_id = "${azurerm_network_security_group.demo.id}"
+
+    ip_configuration {
+    name                          = "backendipconfig"
+    subnet_id                     = "${azurerm_subnet.back.id}"
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
+#create virtual machine
+
+resource "azurerm_virtual_machine" "front" {
+    name                  = "${var.frontend}"
       location              = "${azurerm_resource_group.demo.location}"
   resource_group_name   = "${azurerm_resource_group.demo.name}"
-    network_interface_ids = ["${azurerm_network_interface.demo.id}","${azurerm_network_interface.back.id}"]
-  vm_size               = "Standard_DS1_v2"
+    network_interface_ids = ["${azurerm_network_interface.front.id}"]
+  vm_size               = "Standard_B1s"
+
+  storage_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "16.04-LTS"
+    version   = "latest"
+  }
+  storage_os_disk {
+    name              = "myosdisk0"
+    caching           = "ReadWrite"
+    create_option     = "FromImage"
+    managed_disk_type = "Standard_LRS"
+  }
+    os_profile {
+    computer_name  = "${var.frontend}"
+    admin_username = "${var.username}"
+    admin_password = "${var.password}"
+  }
+  os_profile_linux_config {
+    disable_password_authentication = false
+    }
+    tags = {
+    environment = "staging"
+  }
+}
+
+resource "azurerm_virtual_machine" "back" {
+    name                  = "${var.backend}"
+      location              = "${azurerm_resource_group.demo.location}"
+  resource_group_name   = "${azurerm_resource_group.demo.name}"
+    network_interface_ids = ["${azurerm_network_interface.back.id}"]
+  vm_size               = "Standard_B1s"
 
   storage_image_reference {
     publisher = "Canonical"
@@ -53,15 +111,15 @@ resource "azurerm_virtual_machine" "demo" {
     managed_disk_type = "Standard_LRS"
   }
     os_profile {
-    computer_name  = "${var.virtualmachinename}${count.index}"
-    admin_username = "${var.username}"
-    admin_password = "${var.password}"
+    computer_name  = "${var.backend}"
+    admin_username = "${var.username1}"
+    admin_password = "${var.password1}"
   }
   os_profile_linux_config {
     disable_password_authentication = false
     }
     tags = {
-    environment = "staging"
+    environment = "test"
   }
 }
 
@@ -106,30 +164,14 @@ resource "azurerm_public_ip" "demo" {
   allocation_method   = "Dynamic"
 }
 
-resource "azurerm_subnet" "back" {
-    name           = "${var.backsub}"
-     resource_group_name  = "${azurerm_resource_group.demo.name}"
-    virtual_network_name = "${azurerm_virtual_network.demo.name}"
-        address_prefix = "10.0.2.0/24"
+resource "azurerm_subnet_network_security_group_association" "front" {
+  subnet_id                 = "${azurerm_subnet.front.id}"
+  network_security_group_id = "${azurerm_network_security_group.demo.id}"
 }
 
-resource "azurerm_subnet_network_security_group_association" "demo" {
+resource "azurerm_subnet_network_security_group_association" "back" {
   subnet_id                 = "${azurerm_subnet.back.id}"
   network_security_group_id = "${azurerm_network_security_group.demo.id}"
-}
-
-resource "azurerm_network_interface" "back" {
-  name                = "${var.aznetworkinterface}${count.index}"
-  location            = "${azurerm_resource_group.demo.location}"
-  resource_group_name = "${azurerm_resource_group.demo.name}"   
-  network_security_group_id = "${azurerm_network_security_group.demo.id}"
-
-    ip_configuration {
-    name                          = "backendipconfig"
-    subnet_id                     = "${azurerm_subnet.back.id}"
-    private_ip_address_allocation = "Dynamic"
-    public_ip_address_id = "${azurerm_public_ip.demo.id}"
-  }
 }
 
   resource "azurerm_network_security_rule" "back" {
@@ -144,4 +186,45 @@ resource "azurerm_network_interface" "back" {
   destination_address_prefix  = "*"
   resource_group_name         = "${azurerm_resource_group.demo.name}"
   network_security_group_name = "${azurerm_network_security_group.demo.name}"
+}
+
+resource "azurerm_storage_account" "test" {
+  name                     = "testaccs"
+  resource_group_name      = "${azurerm_resource_group.demo.name}"
+  location                 = "westus"
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+resource "azurerm_storage_container" "test" {
+  name                  = "vhds"
+  resource_group_name   = "${azurerm_resource_group.demo.name}"
+  storage_account_name  = "${azurerm_storage_account.test.name}"
+  container_access_type = "private"
+}
+
+/*resource "azurerm_storage_blob" "testblob" {
+  name = "sample.vhd"
+  resource_group_name    = "${azurerm_resource_group.demo.name}"
+  storage_account_name   = "${azurerm_storage_account.test.name}"
+  storage_container_name = "${azurerm_storage_container.test.name}"
+
+  type = "page"
+  size = 10
+}*/
+
+resource "azurerm_managed_disk" "test" {
+  name                 = "disk1"
+  location             = "${azurerm_resource_group.demo.location}"
+  resource_group_name  = "${azurerm_resource_group.demo.name}"
+  storage_account_type = "Standard_LRS"
+  create_option        = "Empty"
+  disk_size_gb         = 10
+}
+
+resource "azurerm_virtual_machine_data_disk_attachment" "test" {
+  managed_disk_id    = "${azurerm_managed_disk.test.id}"
+  virtual_machine_id = "${azurerm_virtual_machine.front.id}"
+  lun                = "10"
+  caching            = "ReadWrite"
 }
